@@ -20,12 +20,16 @@ SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'your-anon-key')
 
 # Initialize Supabase client - ONE LINE!
 try:
+    # Check if we have valid credentials
+    if not SUPABASE_URL or not SUPABASE_KEY or 'your-project' in SUPABASE_URL:
+        raise Exception("Supabase credentials not configured")
+
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     SUPABASE_CONNECTED = True
     print("🚀 Supabase connected successfully!")
 except Exception as e:
-    print(f"⚠️  Supabase not configured: {e}")
-    print("📝 Using mock data for local development")
+    print(f"⚠️  Supabase connection failed: {e}")
+    print("📝 Using mock data for development")
     supabase = None
     SUPABASE_CONNECTED = False
 
