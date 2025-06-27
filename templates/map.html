@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map - PingGov</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            color: #000000;
+        }
+        .header {
+            background-color: #ffcc00;
+            padding: 1rem;
+            text-align: center;
+        }
+        .nav {
+            background-color: #000000;
+            padding: 1rem;
+            text-align: center;
+        }
+        .nav a {
+            color: #ffcc00;
+            text-decoration: none;
+            margin: 0 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+        }
+        .nav a:hover {
+            background-color: #ffcc00;
+            color: #000000;
+        }
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+        .map-container {
+            padding: 1rem;
+        }
+        .controls {
+            background-color: #f9f9f9;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 5px;
+            border-left: 4px solid #ffcc00;
+        }
+        .btn {
+            background-color: #ffcc00;
+            color: #000000;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        .btn:hover {
+            background-color: #e6b800;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>PingGov</h1>
+        <p>Interactive Map - Discover Your Community</p>
+    </div>
+    
+    <div class="nav">
+        <a href="/">Home</a>
+        <a href="/forum">Forum</a>
+        <a href="/profile/1">Profile</a>
+        <a href="/logout">Logout</a>
+    </div>
+    
+    <div class="map-container">
+        <div class="controls">
+            <h3>Map Controls</h3>
+            <button class="btn" onclick="findMyLocation()">Find My Location</button>
+            <button class="btn" onclick="showNearbyUsers()">Show Nearby Users</button>
+            <button class="btn" onclick="showNearbyBusinesses()">Show Nearby Businesses</button>
+        </div>
+        
+        <div id="map"></div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize the map with user's stored location
+        var userLat = {{ user_lat }};
+        var userLng = {{ user_lng }};
+        var map = L.map('map').setView([userLat, userLng], 14);
+
+        // Add tile layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        var userMarker = null;
+        var nearbyMarkers = [];
+
+        // Show user's location marker on load
+        var userMarker = L.marker([userLat, userLng])
+            .addTo(map)
+            .bindPopup(`
+                <div>
+                    <h4>📍 {{ current_user.username }}</h4>
+                    <p>This is your registered location</p>
+                    <small>{{ current_user.bio or 'No bio available' }}</small>
+                </div>
+            `)
+            .openPopup();
+        
+        function findMyLocation() {
+            // Use stored user location instead of browser geolocation
+            map.setView([userLat, userLng], 16);
+            userMarker.openPopup();
+            alert(`Centered on your registered location: ${userLat.toFixed(4)}, ${userLng.toFixed(4)}`);
+        }
+        
+        function showNearbyUsers() {
+            alert('Loading nearby users...');
+            console.log('showNearbyUsers called');
+
+            // Clear existing markers
+            clearNearbyMarkers();
+
+            // Fetch real nearby users from API
+            fetch('/api/nearby-users')
+                .then(response => {
+                    console.log('API response received:', response.status);
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(users => {
+                    console.log('Users data:', users);
+                    console.log('Number of users:', users.length);
+
+                    if (users.length === 0) {
+                        alert('No nearby users found in your area.');
+                        return;
+                    }
+
+                    // Add markers for each user
+                    users.forEach(function(user, index) {
+                        console.log(`Adding marker ${index + 1} for user:`, user.username, 'at', user.latitude, user.longitude);
+
+                        // Create a simple marker with green color
+                        var marker = L.marker([user.latitude, user.longitude])
+                            .addTo(map)
+                            .bindPopup(`
+                                <div>
+                                    <h4>👤 ${user.username}</h4>
+                                    <p>${user.bio}</p>
+                                    <p>Rating: ${user.rating.toFixed(1)} ⭐</p>
+                                    <a href="/profile/${user.id}" target="_blank">View Profile</a>
+                                </div>
+                            `);
+
+                        nearbyMarkers.push(marker);
+                    });
+
+                    // Center map to show all markers
+                    if (users.length > 0) {
+                        var group = new L.featureGroup(nearbyMarkers);
+                        map.fitBounds(group.getBounds().pad(0.1));
+                    }
+
+                    alert(`✅ Added ${users.length} users to the map! Click on the markers to see details.`);
+                })
+                .catch(error => {
+                    console.error('Error fetching nearby users:', error);
+                    alert('❌ Error loading nearby users: ' + error.message);
+                });
+        }
+        
+        function showNearbyBusinesses() {
+            console.log('showNearbyBusinesses called');
+            // Clear existing markers
+            clearNearbyMarkers();
+
+            // Fetch real nearby businesses from API
+            fetch('/api/nearby-businesses')
+                .then(response => {
+                    console.log('Business API response received:', response.status);
+                    return response.json();
+                })
+                .then(businesses => {
+                    console.log('Businesses data:', businesses);
+                    console.log('Number of businesses:', businesses.length);
+                    businesses.forEach(function(business) {
+                        var marker = L.marker([business.latitude, business.longitude])
+                            .addTo(map)
+                            .bindPopup(`
+                                <div style="min-width: 200px;">
+                                    <b>🏪 ${business.business_name}</b><br>
+                                    <small>${business.business_category}</small><br>
+                                    <small>${business.bio}</small><br>
+                                    <small>Rating: ${'⭐'.repeat(Math.round(business.rating))} ${business.rating.toFixed(1)}</small><br>
+                                    <button onclick="window.location.href='/profile/${business.id}'" style="margin-top: 5px; padding: 5px 10px; background: #ffcc00; border: none; border-radius: 3px; cursor: pointer;">View Business</button>
+                                </div>
+                            `);
+
+                        // Custom icon for businesses
+                        var businessIcon = L.divIcon({
+                            className: 'business-marker',
+                            html: '<div style="background-color: #ff6600; width: 20px; height: 20px; border-radius: 50%; border: 2px solid #000; display: flex; align-items: center; justify-content: center; font-size: 12px;">🏪</div>',
+                            iconSize: [20, 20],
+                            iconAnchor: [10, 10]
+                        });
+                        marker.setIcon(businessIcon);
+
+                        nearbyMarkers.push(marker);
+                    });
+
+                    if (businesses.length === 0) {
+                        alert('No nearby businesses found in your area.');
+                    } else {
+                        alert(`Found ${businesses.length} nearby businesses! Check the map for pins.`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching nearby businesses:', error);
+                    alert('Error loading nearby businesses. Please try again.');
+                });
+        }
+        
+        function clearNearbyMarkers() {
+            nearbyMarkers.forEach(function(marker) {
+                map.removeLayer(marker);
+            });
+            nearbyMarkers = [];
+        }
+        
+        // Map is ready - user location already shown
+    </script>
+</body>
+</html>

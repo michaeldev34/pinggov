@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forum - PingGov</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #ffffff;
+            color: #000000;
+        }
+        .header {
+            background-color: #ffcc00;
+            padding: 1rem;
+            text-align: center;
+        }
+        .nav {
+            background-color: #000000;
+            padding: 1rem;
+            text-align: center;
+        }
+        .nav a {
+            color: #ffcc00;
+            text-decoration: none;
+            margin: 0 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 5px;
+        }
+        .nav a:hover {
+            background-color: #ffcc00;
+            color: #000000;
+        }
+        .container {
+            max-width: 800px;
+            margin: 2rem auto;
+            padding: 1rem;
+        }
+        .post-form {
+            background-color: #f9f9f9;
+            padding: 1.5rem;
+            border-radius: 10px;
+            border-left: 4px solid #ffcc00;
+            margin-bottom: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            box-sizing: border-box;
+            min-height: 100px;
+        }
+        .btn {
+            background-color: #ffcc00;
+            color: #000000;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        .btn:hover {
+            background-color: #e6b800;
+        }
+        .post {
+            background-color: #f9f9f9;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+            border-left: 4px solid #ffcc00;
+        }
+        .post-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 0.5rem;
+        }
+        .post-author {
+            font-weight: bold;
+            color: #000000;
+        }
+        .post-time {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .post-content {
+            line-height: 1.6;
+        }
+        .no-posts {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>PingGov</h1>
+        <p>Local Community Forum</p>
+    </div>
+    
+    <div class="nav">
+        <a href="/">Home</a>
+        <a href="/map">Map</a>
+        <a href="/forum">Forum</a>
+        <a href="/profile/1">Profile</a>
+        <a href="/logout">Logout</a>
+    </div>
+    
+    <div class="container">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div style="background-color: #ccffcc; padding: 1rem; margin-bottom: 1rem; border-radius: 5px; border: 1px solid #00cc00;">
+                    {% for message in messages %}
+                        <p style="margin: 0; color: #006600;">{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="post-form">
+            <h3>Share with Your Local Community</h3>
+            <form method="POST" action="/forum">
+                <div class="form-group">
+                    <label for="content">What's happening in your area?</label>
+                    <textarea id="content" name="content" placeholder="Share news, events, or ask questions about your local area..." required></textarea>
+                </div>
+                <button type="submit" class="btn">Post to Local Forum</button>
+            </form>
+        </div>
+        
+        <div class="posts-section">
+            <h3>Recent Local Posts</h3>
+
+            {% if posts %}
+                {% for post in posts %}
+                <div class="post">
+                    <div class="post-header">
+                        <span class="post-author">
+                            {% if post.user.user_type == 'business' %}
+                                🏪 {{ post.user.business_name or post.user.username }}
+                            {% else %}
+                                👤 {{ post.user.username }}
+                            {% endif %}
+                        </span>
+                        <span class="post-time">{{ post.timestamp.strftime('%B %d at %I:%M %p') }}</span>
+                    </div>
+                    <div class="post-content">
+                        {{ post.content }}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="no-posts">
+                    <p>No posts in your area yet. Be the first to share something!</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
