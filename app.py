@@ -3,9 +3,13 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from supabase import create_client, Client
 from geopy.distance import geodesic
 from datetime import datetime
+from dotenv import load_dotenv
 import os
 import hashlib
 import uuid
+
+# Load environment variables
+load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -15,7 +19,15 @@ SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://your-project.supabase.co'
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'your-anon-key')
 
 # Initialize Supabase client - ONE LINE!
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    SUPABASE_CONNECTED = True
+    print("🚀 Supabase connected successfully!")
+except Exception as e:
+    print(f"⚠️  Supabase not configured: {e}")
+    print("📝 Using mock data for local development")
+    supabase = None
+    SUPABASE_CONNECTED = False
 
 # Simple session management (no complex Flask-Login needed)
 def hash_password(password):
@@ -43,9 +55,40 @@ def get_current_user():
 # - forum_posts (id, user_id, content, latitude, longitude, created_at)
 # - chats (id, sender_id, receiver_id, message, created_at)
 
+# 🎭 MOCK DATA for local development (when Supabase not configured)
+MOCK_USERS = [
+    {'id': '1', 'username': 'john_nyc', 'email': 'john@example.com', 'password': hash_password('password123'), 'user_type': 'person', 'latitude': 40.7589, 'longitude': -73.9851, 'bio': 'Love exploring NYC!', 'rating': 4.5},
+    {'id': '2', 'username': 'sarah_manhattan', 'email': 'sarah@example.com', 'password': hash_password('password123'), 'user_type': 'person', 'latitude': 40.7505, 'longitude': -73.9934, 'bio': 'Coffee enthusiast', 'rating': 4.8},
+    {'id': '3', 'username': 'joes_coffee', 'email': 'info@joescoffee.com', 'password': hash_password('business123'), 'user_type': 'business', 'latitude': 40.7614, 'longitude': -73.9776, 'business_name': "Joe's Coffee Shop", 'business_category': 'Restaurant', 'bio': 'Best coffee in NYC!', 'rating': 4.7}
+]
+
+MOCK_POSTS = [
+    {'id': '1', 'user_id': '1', 'content': 'Anyone know what\'s happening at Washington Square Park today?', 'latitude': 40.7589, 'longitude': -73.9851, 'created_at': '2025-01-27T10:00:00Z', 'users': {'username': 'john_nyc', 'user_type': 'person'}},
+    {'id': '2', 'user_id': '2', 'content': 'New coffee shop opened on 8th Ave! Great espresso ☕', 'latitude': 40.7505, 'longitude': -73.9934, 'created_at': '2025-01-27T09:00:00Z', 'users': {'username': 'sarah_manhattan', 'user_type': 'person'}}
+]
+
 # Helper functions for database operations
 def create_user(username, email, password, user_type, latitude=None, longitude=None, bio=None, business_name=None, business_category=None):
     """Create a new user - ONE LINE!"""
+    if not SUPABASE_CONNECTED:
+        # Mock response for local development
+        user_data = {
+            'id': str(uuid.uuid4()),
+            'username': username,
+            'email': email,
+            'password': hash_password(password),
+            'user_type': user_type,
+            'latitude': latitude,
+            'longitude': longitude,
+            'bio': bio,
+            'business_name': business_name,
+            'business_category': business_category,
+            'rating': 4.5,
+            'created_at': datetime.utcnow().isoformat()
+        }
+        MOCK_USERS.append(user_data)
+        return type('MockResult', (), {'data': [user_data]})()
+
     user_data = {
         'id': str(uuid.uuid4()),
         'username': username,
@@ -64,16 +107,28 @@ def create_user(username, email, password, user_type, latitude=None, longitude=N
 
 def get_user_by_email(email):
     """Get user by email - ONE LINE!"""
+    if not SUPABASE_CONNECTED:
+        return next((user for user in MOCK_USERS if user['email'] == email), None)
+
     result = supabase.table('users').select('*').eq('email', email).execute()
     return result.data[0] if result.data else None
 
 def get_user_by_username(username):
     """Get user by username - ONE LINE!"""
+    if not SUPABASE_CONNECTED:
+        return next((user for user in MOCK_USERS if user['username'] == username), None)
+
     result = supabase.table('users').select('*').eq('username', username).execute()
     return result.data[0] if result.data else None
 
 def get_nearby_users(exclude_user_id=None):
     """Get all nearby users - ONE LINE!"""
+    if not SUPABASE_CONNECTED:
+        users = [user for user in MOCK_USERS if user['user_type'] == 'person']
+        if exclude_user_id:
+            users = [user for user in users if user['id'] != exclude_user_id]
+        return users
+
     query = supabase.table('users').select('*').eq('user_type', 'person')
     if exclude_user_id:
         query = query.neq('id', exclude_user_id)
@@ -81,6 +136,9 @@ def get_nearby_users(exclude_user_id=None):
 
 def get_nearby_businesses():
     """Get all nearby businesses - ONE LINE!"""
+    if not SUPABASE_CONNECTED:
+        return [user for user in MOCK_USERS if user['user_type'] == 'business']
+
     return supabase.table('users').select('*').eq('user_type', 'business').execute().data
 
 def create_forum_post(user_id, content, latitude=None, longitude=None):
@@ -415,6 +473,11 @@ def init_database():
 # Supabase handles everything automatically!
 
 # For Vercel deployment - this is the entry point
+def handler(request):
+    """Vercel serverless function handler"""
+    return app(request.environ, lambda status, headers: None)
+
+# Alternative handler for Vercel
 app_handler = app
 
 # Run locally
