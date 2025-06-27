@@ -64,10 +64,31 @@ Visit the live application: [PingGov on Vercel](https://your-app-url.vercel.app)
 
 This app is configured for easy deployment on Vercel:
 
-1. Push to GitHub
-2. Connect your GitHub repo to Vercel
-3. Set environment variables in Vercel dashboard
+### Step 1: Deploy to Vercel
+1. Go to [vercel.com](https://vercel.com) and sign in with GitHub
+2. Click "New Project" and import `michaeldev34/pinggov`
+3. Set environment variables:
+   ```
+   SECRET_KEY=your-super-secret-key-here
+   DATABASE_URL=postgresql://username:password@host:port/database
+   ```
 4. Deploy!
+
+### Step 2: Set up Database
+- **Recommended**: Use Vercel Postgres (go to Storage → Create Database)
+- **Alternative**: Use Supabase, Railway, or Neon PostgreSQL
+
+### Step 3: Initialize Test Data
+After deployment, visit: `https://your-app.vercel.app/init-database`
+
+This will automatically create:
+- 7 test user accounts (password: `password123`)
+- 5 test business accounts (password: `business123`)
+- Sample forum posts
+- All located in NYC area for testing
+
+### Step 4: Start Using!
+Your app is ready with test data. Login with any test account and explore!
 
 ## 📁 Project Structure
 
