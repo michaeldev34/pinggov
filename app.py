@@ -1,12 +1,13 @@
 # Import necessary libraries
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
-from supabase import create_client, Client
 from geopy.distance import geodesic
 from datetime import datetime
 from dotenv import load_dotenv
 import os
 import hashlib
 import uuid
+import requests
+import json
 
 # Load environment variables
 load_dotenv()
@@ -14,23 +15,30 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
-# Supabase configuration - BLAZING FAST! 🚀
+# 🚀 SUPABASE REST API - ULTRA FAST & RELIABLE!
 SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://your-project.supabase.co')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY', 'your-anon-key')
 
-# Initialize Supabase client - ONE LINE!
+# Supabase REST API headers
+SUPABASE_HEADERS = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': f'Bearer {SUPABASE_KEY}',
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation'
+}
+
+# Check if Supabase is configured
 try:
-    # Check if we have valid credentials
     if not SUPABASE_URL or not SUPABASE_KEY or 'your-project' in SUPABASE_URL:
         raise Exception("Supabase credentials not configured")
 
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    # Test connection with a simple request
+    test_response = requests.get(f'{SUPABASE_URL}/rest/v1/', headers=SUPABASE_HEADERS, timeout=5)
     SUPABASE_CONNECTED = True
-    print("🚀 Supabase connected successfully!")
+    print("🚀 Supabase REST API connected successfully!")
 except Exception as e:
     print(f"⚠️  Supabase connection failed: {e}")
     print("📝 Using mock data for development")
-    supabase = None
     SUPABASE_CONNECTED = False
 
 # Simple session management (no complex Flask-Login needed)
@@ -50,8 +58,15 @@ def require_login(f):
 
 def get_current_user():
     if 'user_id' in session:
-        result = supabase.table('users').select('*').eq('id', session['user_id']).execute()
-        return result.data[0] if result.data else None
+        if not SUPABASE_CONNECTED:
+            return next((user for user in MOCK_USERS if user['id'] == session['user_id']), None)
+
+        response = requests.get(
+            f'{SUPABASE_URL}/rest/v1/users?id=eq.{session["user_id"]}',
+            headers=SUPABASE_HEADERS
+        )
+        data = response.json()
+        return data[0] if data else None
     return None
 # 🚀 NO DATABASE MODELS NEEDED!
 # Supabase handles everything automatically with tables:
@@ -107,23 +122,37 @@ def create_user(username, email, password, user_type, latitude=None, longitude=N
         'rating': 4.5,
         'created_at': datetime.utcnow().isoformat()
     }
-    return supabase.table('users').insert(user_data).execute()
+    # Insert user via REST API
+    response = requests.post(
+        f'{SUPABASE_URL}/rest/v1/users',
+        headers=SUPABASE_HEADERS,
+        json=user_data
+    )
+    return response.json()
 
 def get_user_by_email(email):
     """Get user by email - ONE LINE!"""
     if not SUPABASE_CONNECTED:
         return next((user for user in MOCK_USERS if user['email'] == email), None)
 
-    result = supabase.table('users').select('*').eq('email', email).execute()
-    return result.data[0] if result.data else None
+    response = requests.get(
+        f'{SUPABASE_URL}/rest/v1/users?email=eq.{email}',
+        headers=SUPABASE_HEADERS
+    )
+    data = response.json()
+    return data[0] if data else None
 
 def get_user_by_username(username):
     """Get user by username - ONE LINE!"""
     if not SUPABASE_CONNECTED:
         return next((user for user in MOCK_USERS if user['username'] == username), None)
 
-    result = supabase.table('users').select('*').eq('username', username).execute()
-    return result.data[0] if result.data else None
+    response = requests.get(
+        f'{SUPABASE_URL}/rest/v1/users?username=eq.{username}',
+        headers=SUPABASE_HEADERS
+    )
+    data = response.json()
+    return data[0] if data else None
 
 def get_nearby_users(exclude_user_id=None):
     """Get all nearby users - ONE LINE!"""
@@ -133,20 +162,38 @@ def get_nearby_users(exclude_user_id=None):
             users = [user for user in users if user['id'] != exclude_user_id]
         return users
 
-    query = supabase.table('users').select('*').eq('user_type', 'person')
+    url = f'{SUPABASE_URL}/rest/v1/users?user_type=eq.person'
     if exclude_user_id:
-        query = query.neq('id', exclude_user_id)
-    return query.execute().data
+        url += f'&id=neq.{exclude_user_id}'
+
+    response = requests.get(url, headers=SUPABASE_HEADERS)
+    return response.json()
 
 def get_nearby_businesses():
     """Get all nearby businesses - ONE LINE!"""
     if not SUPABASE_CONNECTED:
         return [user for user in MOCK_USERS if user['user_type'] == 'business']
 
-    return supabase.table('users').select('*').eq('user_type', 'business').execute().data
+    response = requests.get(
+        f'{SUPABASE_URL}/rest/v1/users?user_type=eq.business',
+        headers=SUPABASE_HEADERS
+    )
+    return response.json()
 
 def create_forum_post(user_id, content, latitude=None, longitude=None):
     """Create forum post - ONE LINE!"""
+    if not SUPABASE_CONNECTED:
+        post_data = {
+            'id': str(uuid.uuid4()),
+            'user_id': user_id,
+            'content': content,
+            'latitude': latitude,
+            'longitude': longitude,
+            'created_at': datetime.utcnow().isoformat()
+        }
+        MOCK_POSTS.append(post_data)
+        return post_data
+
     post_data = {
         'id': str(uuid.uuid4()),
         'user_id': user_id,
@@ -155,11 +202,23 @@ def create_forum_post(user_id, content, latitude=None, longitude=None):
         'longitude': longitude,
         'created_at': datetime.utcnow().isoformat()
     }
-    return supabase.table('forum_posts').insert(post_data).execute()
+    response = requests.post(
+        f'{SUPABASE_URL}/rest/v1/forum_posts',
+        headers=SUPABASE_HEADERS,
+        json=post_data
+    )
+    return response.json()
 
 def get_forum_posts():
     """Get forum posts with user data - ONE LINE!"""
-    return supabase.table('forum_posts').select('*, users(username, user_type, business_name)').order('created_at', desc=True).limit(10).execute().data
+    if not SUPABASE_CONNECTED:
+        return MOCK_POSTS
+
+    response = requests.get(
+        f'{SUPABASE_URL}/rest/v1/forum_posts?select=*,users(username,user_type,business_name)&order=created_at.desc&limit=10',
+        headers=SUPABASE_HEADERS
+    )
+    return response.json()
 # Routes
 @app.route('/health')
 def health():
@@ -284,8 +343,15 @@ def forum():
 @require_login
 def profile(user_id):
     # Get user by ID - ONE LINE!
-    result = supabase.table('users').select('*').eq('id', user_id).execute()
-    user = result.data[0] if result.data else None
+    if not SUPABASE_CONNECTED:
+        user = next((user for user in MOCK_USERS if user['id'] == user_id), None)
+    else:
+        response = requests.get(
+            f'{SUPABASE_URL}/rest/v1/users?id=eq.{user_id}',
+            headers=SUPABASE_HEADERS
+        )
+        data = response.json()
+        user = data[0] if data else None
 
     if not user:
         flash('User not found')
@@ -347,8 +413,12 @@ def init_database():
     """🚀 Initialize Supabase with test users - BLAZING FAST!"""
     try:
         # Check if users already exist
-        existing_users = supabase.table('users').select('id').execute()
-        if existing_users.data:
+        if not SUPABASE_CONNECTED:
+            return "⚠️ Supabase not connected. Using mock data."
+
+        response = requests.get(f'{SUPABASE_URL}/rest/v1/users?select=id', headers=SUPABASE_HEADERS)
+        existing_users = response.json()
+        if existing_users:
             return f"""
             <h1>🚀 Supabase Database Already Initialized</h1>
             <p>Found {len(existing_users.data)} existing users in Supabase.</p>
