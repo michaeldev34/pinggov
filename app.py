@@ -74,6 +74,10 @@ class Chat(db.Model):
     sender = db.relationship('User', foreign_keys=[sender_id], backref='sent_messages')
     receiver = db.relationship('User', foreign_keys=[receiver_id], backref='received_messages')
 # Routes
+@app.route('/health')
+def health():
+    return {'status': 'ok', 'message': 'PingGov is running!'}, 200
+
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -269,8 +273,9 @@ def test_api():
 def init_database():
     """Initialize database with test users - for production deployment"""
     try:
-        # Create tables
-        db.create_all()
+        # Create tables first
+        with app.app_context():
+            db.create_all()
 
         # Check if users already exist
         existing_users = User.query.count()
@@ -409,9 +414,11 @@ def init_database():
         <p><a href="/">Go to Home Page</a></p>
         """
 
-# Initialize database
-with app.app_context():
-    db.create_all()
+# For Vercel deployment - this is the entry point
+app_handler = app
 
+# Initialize database only in local development
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(debug=True)
