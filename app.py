@@ -554,8 +554,15 @@ def handler(request):
 # Alternative handler for Vercel
 app_handler = app
 
-# Run locally
+# Run locally and on Render
 if __name__ == '__main__':
     print("🚀 Starting PingGov with Supabase - BLAZING FAST!")
     print(f"📡 Supabase URL: {SUPABASE_URL}")
-    app.run(debug=True)
+
+    # Get port from environment (Render sets this)
+    port = int(os.environ.get('PORT', 5000))
+
+    # Bind to 0.0.0.0 for production, localhost for development
+    host = '0.0.0.0' if os.environ.get('RENDER') else '127.0.0.1'
+
+    app.run(host=host, port=port, debug=False)
